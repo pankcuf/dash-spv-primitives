@@ -128,6 +128,7 @@ pub struct UInt512(pub [u8; 64]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UInt768(pub [u8; 96]);
 
+#[macro_export]
 macro_rules! impl_bytes_decodable {
     ($var_type: ident) => {
         impl<'a> BytesDecodable<'a, $var_type> for $var_type {
@@ -140,6 +141,7 @@ macro_rules! impl_bytes_decodable {
         }
     }
 }
+#[macro_export]
 macro_rules! impl_bytes_decodable_lt {
     ($var_type: ident) => {
         impl<'a> BytesDecodable<'a, $var_type<'a>> for $var_type<'a> {
@@ -153,6 +155,7 @@ macro_rules! impl_bytes_decodable_lt {
     }
 }
 
+#[macro_export]
 macro_rules! impl_decodable {
     ($var_type: ident, $byte_len: expr) => {
         impl_bytes_decodable!($var_type);
@@ -169,6 +172,7 @@ macro_rules! impl_decodable {
     }
 }
 
+#[macro_export]
 macro_rules! define_try_read_to_big_uint {
     ($uint_type: ident, $byte_len: expr) => {
         impl<'a> TryRead<'a, Endian> for $uint_type {
@@ -186,6 +190,7 @@ macro_rules! define_try_read_to_big_uint {
     }
 }
 
+#[macro_export]
 macro_rules! define_bytes_to_big_uint {
     ($uint_type: ident, $byte_len: expr) => {
         define_try_read_to_big_uint!($uint_type, $byte_len);
