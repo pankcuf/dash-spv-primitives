@@ -2,6 +2,13 @@ use byte::{BytesExt, check_len, LE, Result, TryRead, TryWrite};
 use byte::ctx::{Bytes, Endian};
 use std::fmt::Write;
 use std::{mem, slice};
+use diesel::backend::Backend;
+use diesel::{deserialize, serialize};
+use diesel::deserialize::FromSql;
+use diesel::serialize::{Output, ToSql};
+use diesel::sql_types::Binary;
+use diesel::sqlite::Sqlite;
+
 use crate::consensus::{Decodable, Encodable, ReadExt, WriteExt};
 use crate::consensus::encode::VarInt;
 use crate::hashes::{Hash, sha256d, hex::{FromHex, ToHex}, hex};
@@ -127,6 +134,25 @@ pub struct UInt384(pub [u8; 48]);
 pub struct UInt512(pub [u8; 64]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UInt768(pub [u8; 96]);
+
+#[macro_export]
+macro_rules! impl_sqlite_io {
+    ($var_type: ident, $byte_len: expr) => {
+        impl ToSql<Binary, Sqlite> for $var_type {
+            fn to_sql<W: std::io::Write>(&self, out: &mut Output<W, Sqlite>) -> serialize::Result {
+                <[u8] as ToSql<Binary, Sqlite>>::to_sql(&self.0[..], out)
+            }
+        }
+
+        impl FromSql<Binary, Sqlite> for $var_type {
+            fn from_sql(bytes: Option<&<Sqlite as Backend>::RawValue>) -> deserialize::Result<Self> {
+                let bytes_vec: Vec<u8> = <Vec<u8> as FromSql<Binary, Sqlite>>::from_sql(bytes)?;
+                let u = $var_type::consensus_decode(bytes_vec.as_slice())?;
+                Ok(u)
+            }
+        }
+    }
+}
 
 #[macro_export]
 macro_rules! impl_bytes_decodable {
@@ -268,7 +294,9 @@ macro_rules! define_bytes_to_big_uint {
                 true
             }
         }
+
         impl_decodable!($uint_type, $byte_len);
+        impl_sqlite_io!($uint_type, $byte_len);
     }
 }
 
