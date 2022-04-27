@@ -292,7 +292,7 @@ define_bytes_to_big_uint!(UInt512, 64);
 define_bytes_to_big_uint!(UInt768, 96);
 
 impl<'a> TryRead<'a, Endian> for VarInt {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> Result<(Self, usize)> {
+    fn try_read(bytes: &'a [u8], _endian: Endian) -> Result<(Self, usize)> {
         match VarInt::consensus_decode(bytes) {
             Ok(data) => Ok((data, data.len())),
             Err(_err) => Err(byte::Error::BadInput { err: "Error: VarInt" })
@@ -322,7 +322,7 @@ impl<'a> VarBytes<'a> {
 }
 
 impl<'a> TryRead<'a, Endian> for VarBytes<'a> {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> Result<(Self, usize)> {
+    fn try_read(bytes: &'a [u8], _endian: Endian) -> Result<(Self, usize)> {
         let offset = &mut 0;
         let var_int = bytes.read_with::<VarInt>(offset, LE)?;
         let payload = bytes.read_with(offset, Bytes::Len(var_int.0 as usize))?;
