@@ -6,6 +6,8 @@ use std::io;
 #[cfg(not(feature = "std"))]
 use core2::io;
 
+#[macro_use] extern crate diesel;
+
 #[macro_use]
 pub mod internal_macros;
 
