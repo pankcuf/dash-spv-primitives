@@ -163,6 +163,14 @@ macro_rules! impl_sqlite_io {
                 Ok(u)
             }
         }
+        impl FromSql<diesel::sql_types::Nullable<Binary>, Sqlite> for $var_type {
+            fn from_sql(bytes: Option<&<Sqlite as Backend>::RawValue>) -> deserialize::Result<Self> {
+                let bytes_vec: Vec<u8> = <Vec<u8> as FromSql<Binary, Sqlite>>::from_sql(bytes)?;
+                let u = $var_type::consensus_decode(bytes_vec.as_slice())?;
+                Ok(u)
+            }
+        }
+
     }
 }
 
