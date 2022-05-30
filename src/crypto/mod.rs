@@ -1,5 +1,9 @@
 pub mod data_ops;
 pub mod byte_util;
+pub mod var_bytes;
+pub mod var_int;
+pub mod bool;
+pub mod diesel_ext;
 
 /*pub static DASH_PUBKEY_ADDRESS: u8 = 76;
 pub static DASH_SCRIPT_ADDRESS: i32 = 16;

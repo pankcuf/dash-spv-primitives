@@ -1,60 +1,12 @@
-use byte::{BytesExt, check_len, LE, Result, TryRead, TryWrite};
-use byte::ctx::{Bytes, Endian};
-use std::fmt::Write;
-use std::{mem, slice};
-use diesel::backend::Backend;
-use diesel::{deserialize, serialize};
-use diesel::deserialize::FromSql;
-use diesel::serialize::{Output, ToSql};
+use byte::{BytesExt, LE, Result, TryRead};
+use byte::ctx::Endian;
 use diesel::sql_types::Binary;
-use diesel::sqlite::Sqlite;
-
+use std::{mem, slice};
+use hashes::Hash;
 use crate::consensus::{Decodable, Encodable, ReadExt, WriteExt};
-use crate::consensus::encode::VarInt;
-use crate::hashes::{Hash, sha256d, hex::{FromHex, ToHex}, hex};
+use crate::hashes::{hex::{FromHex, ToHex}, hex};
 
-pub trait Data {
-    fn bit_is_true_at_le_index(&self, index: u32) -> bool;
-    fn true_bits_count(&self) -> u64;
-}
-
-impl Data for [u8] {
-
-    fn bit_is_true_at_le_index(&self, index: u32) -> bool {
-        let offset = &mut ((index / 8) as usize);
-        let bit_position = index % 8;
-        match self.read_with::<u8>(offset, LE) {
-            Ok(bits) => (bits >> bit_position) & 1 != 0,
-            _ => false
-        }
-    }
-
-    fn true_bits_count(&self) -> u64 {
-        let mut count = 0;
-        for mut i in 0..self.len() {
-            let mut bits: u8 = self.read_with(&mut i, LE).unwrap();
-            for _j in 0..8 {
-                if bits & 1 != 0 {
-                    count += 1;
-                }
-                bits >>= 1;
-            }
-        }
-        count
-    }
-}
-
-
-pub fn hex_with_data(data: &[u8]) -> String {
-    let n = data.len();
-    let mut s = String::with_capacity(2 * n);
-    let mut iter = data.iter();
-    while let Some(a) = iter.next() {
-        write!(s, "{:02x}", a).unwrap();
-    }
-    s
-}
-
+pub const MN_ENTRY_PAYLOAD_LENGTH: usize = 151;
 
 #[inline]
 pub fn merkle_root_from_hashes(hashes: Vec<UInt256>) -> Option<UInt256> {
@@ -78,34 +30,16 @@ pub fn merkle_root_from_hashes(hashes: Vec<UInt256>) -> Option<UInt256> {
                     left
                 }.consensus_encode(&mut buffer).unwrap();
 
-            higher_level.push(UInt256(sha256d::Hash::hash(&buffer).into_inner()));
+            higher_level.push(UInt256(hashes::sha256d::Hash::hash(&buffer).into_inner()));
         }
         level = higher_level;
     }
     return Some(level[0]);
 }
 
-pub fn short_hex_string_from(data: &[u8]) -> String {
-    let hex_data = hex_with_data(data);
-    if hex_data.len() > 7 {
-        hex_data[..7].to_string()
-    } else {
-        hex_data
-    }
+pub trait AsBytes {
+    fn as_bytes(&self) -> &[u8];
 }
-
-impl<'a> TryWrite for &'a VarInt {
-    #[inline]
-    fn try_write(self, bytes: &mut [u8], _ctx: ()) -> Result<usize> {
-        check_len(bytes, self.len())?;
-        Ok(match self.consensus_encode(bytes) {
-            Ok(size) => size,
-            _ => 0
-        })
-    }
-}
-
-pub const MN_ENTRY_PAYLOAD_LENGTH: usize = 151;
 
 pub trait Reversable {
     fn reversed(&mut self) -> Self;
@@ -147,32 +81,6 @@ pub struct UInt512(pub [u8; 64]);
 #[sql_type = "Binary"]
 pub struct UInt768(pub [u8; 96]);
 
-#[macro_export]
-macro_rules! impl_sqlite_io {
-    ($var_type: ident, $byte_len: expr) => {
-        impl ToSql<Binary, Sqlite> for $var_type {
-            fn to_sql<W: std::io::Write>(&self, out: &mut Output<W, Sqlite>) -> serialize::Result {
-                <[u8] as ToSql<Binary, Sqlite>>::to_sql(&self.0[..], out)
-            }
-        }
-
-        impl FromSql<Binary, Sqlite> for $var_type {
-            fn from_sql(bytes: Option<&<Sqlite as Backend>::RawValue>) -> deserialize::Result<Self> {
-                let bytes_vec: Vec<u8> = <Vec<u8> as FromSql<Binary, Sqlite>>::from_sql(bytes)?;
-                let u = $var_type::consensus_decode(bytes_vec.as_slice())?;
-                Ok(u)
-            }
-        }
-        impl FromSql<diesel::sql_types::Nullable<Binary>, Sqlite> for $var_type {
-            fn from_sql(bytes: Option<&<Sqlite as Backend>::RawValue>) -> deserialize::Result<Self> {
-                let bytes_vec: Vec<u8> = <Vec<u8> as FromSql<Binary, Sqlite>>::from_sql(bytes)?;
-                let u = $var_type::consensus_decode(bytes_vec.as_slice())?;
-                Ok(u)
-            }
-        }
-
-    }
-}
 
 #[macro_export]
 macro_rules! impl_bytes_decodable {
@@ -258,16 +166,14 @@ macro_rules! define_bytes_to_big_uint {
         }
         impl std::fmt::Debug for $uint_type {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                // for i in 0..self.len() {
-                    write!(f, "{}", self.0.to_hex())?;
-                // }
+                write!(f, "{}", self.0.to_hex())?;
                 Ok(())
             }
         }
         impl Encodable for $uint_type {
             #[inline]
             fn consensus_encode<W: std::io::Write>(&self, mut writer: W) -> std::result::Result<usize, std::io::Error> {
-                writer.emit_slice(&self.0[..])?;
+                writer.emit_slice(&self.as_bytes())?;
                 Ok($byte_len)
             }
         }
@@ -315,10 +221,15 @@ macro_rules! define_bytes_to_big_uint {
             }
         }
 
+        impl AsBytes for $uint_type {
+            fn as_bytes(&self) -> &[u8] {
+                &self.0[..]
+            }
+        }
         impl_decodable!($uint_type, $byte_len);
-        impl_sqlite_io!($uint_type, $byte_len);
     }
 }
+
 
 impl_decodable!(u8, 1);
 impl_decodable!(u16, 2);
@@ -338,53 +249,3 @@ define_bytes_to_big_uint!(UInt256, 32);
 define_bytes_to_big_uint!(UInt384, 48);
 define_bytes_to_big_uint!(UInt512, 64);
 define_bytes_to_big_uint!(UInt768, 96);
-
-impl<'a> TryRead<'a, Endian> for VarInt {
-    fn try_read(bytes: &'a [u8], _endian: Endian) -> Result<(Self, usize)> {
-        match VarInt::consensus_decode(bytes) {
-            Ok(data) => Ok((data, data.len())),
-            Err(_err) => Err(byte::Error::BadInput { err: "Error: VarInt" })
-        }
-    }
-}
-
-impl_bytes_decodable!(VarInt);
-// impl_bytes_decodable!(MasternodeEntry);
-// impl_bytes_decodable!(LLMQSnapshot);
-//
-// impl_bytes_decodable_lt!(TransactionInput);
-// impl_bytes_decodable_lt!(TransactionOutput);
-// impl_bytes_decodable_lt!(Transaction);
-// impl_bytes_decodable_lt!(CoinbaseTransaction);
-// impl_bytes_decodable_lt!(LLMQEntry);
-
-/// A variable-length bytes
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
-pub struct VarBytes<'a>(pub VarInt, pub &'a [u8]);
-
-impl<'a> VarBytes<'a> {
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.0.len() + self.1.len()
-    }
-}
-
-impl<'a> TryRead<'a, Endian> for VarBytes<'a> {
-    fn try_read(bytes: &'a [u8], _endian: Endian) -> Result<(Self, usize)> {
-        let offset = &mut 0;
-        let var_int = bytes.read_with::<VarInt>(offset, LE)?;
-        let payload = bytes.read_with(offset, Bytes::Len(var_int.0 as usize))?;
-        let var_bytes = VarBytes(var_int, payload);
-        Ok((var_bytes, var_bytes.len()))
-    }
-}
-impl<'a> BytesDecodable<'a, VarBytes<'a>> for VarBytes<'a> {
-    #[inline]
-    fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> Option<Self> {
-        let var_int: VarInt = VarInt::from_bytes(bytes, offset)?;
-        match bytes.read_with(offset, Bytes::Len(var_int.0 as usize)) {
-            Ok(data) => Some(VarBytes(var_int, data)),
-            Err(_err) => None
-        }
-    }
-}
