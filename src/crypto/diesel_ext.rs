@@ -17,6 +17,12 @@ macro_rules! impl_sqlite_binary_io {
             }
         }
 
+        impl deserialize::FromSql<sql_types::Binary, sqlite::Sqlite> for $var_type {
+            fn from_sql(bytes: Option<&<sqlite::Sqlite as backend::Backend>::RawValue>) -> deserialize::Result<Self> {
+                let bytes_vec: Vec<u8> = <Vec<u8> as deserialize::FromSql<sql_types::Binary, sqlite::Sqlite>>::from_sql(bytes)?;
+                Ok($var_type::consensus_decode(bytes_vec.as_slice())?)
+            }
+        }
         impl deserialize::FromSql<diesel::sql_types::Nullable<sql_types::Binary>, sqlite::Sqlite> for $var_type {
             fn from_sql(bytes: Option<&<sqlite::Sqlite as backend::Backend>::RawValue>) -> deserialize::Result<Self> {
                 let bytes_vec: Vec<u8> = <Vec<u8> as deserialize::FromSql<sql_types::Binary, sqlite::Sqlite>>::from_sql(bytes)?;
