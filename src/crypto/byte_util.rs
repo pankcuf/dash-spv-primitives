@@ -221,6 +221,11 @@ macro_rules! define_bytes_to_big_uint {
             }
         }
 
+        impl $uint_type {
+            pub const MIN: Self = $uint_type([0; $byte_len]);
+            pub const MAX: Self = $uint_type([!0; $byte_len]);
+        }
+
         impl AsBytes for $uint_type {
             fn as_bytes(&self) -> &[u8] {
                 &self.0[..]
