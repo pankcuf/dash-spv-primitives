@@ -81,20 +81,6 @@ pub fn inplace_intersection<T>(a: &mut HashSet<T>, b: &mut HashSet<T>) -> HashSe
     c
 }
 
-// pub fn sha256_1(data: &[u8]) -> [u8; 32] {
-//     let mut hasher = Sha256::new();
-//     hasher.update(data);
-//     let result = hasher.finalize();
-//     result.try_into().expect("error sha-256")
-// }
-//
-// pub fn sha256_2(data: &[u8]) -> [u8; 32] {
-//     let mut hasher = Sha256::new();
-//     hasher.update(data);
-//     let result = hasher.finalize();
-//     hasher.update(&result);
-//     hasher.finalize().try_into().expect("error double sha-256")
-// }
 
 /*pub fn script_elements(script: &[u8]) -> &[u8] {
     // NSMutableArray *a = [NSMutableArray array];
