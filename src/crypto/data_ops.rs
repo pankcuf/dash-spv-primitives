@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 use std::fmt::Write;
-use std::hash::Hash;
 use byte::BytesExt;
 
 pub trait Data {
@@ -59,7 +58,7 @@ pub fn short_hex_string_from(data: &[u8]) -> String {
 /// Extracts the common values in `a` and `b` into a new set.
 pub fn inplace_intersection<T>(a: &mut HashSet<T>, b: &mut HashSet<T>) -> HashSet<T>
     where
-        T: Hash,
+        T: std::hash::Hash,
         T: Eq,
 {
     let x: HashSet<(T, bool)> = a
