@@ -1,6 +1,11 @@
 use std::collections::HashSet;
 use std::fmt::Write;
 use byte::BytesExt;
+use hashes::Hash;
+use crate::crypto::byte_util::{AsBytes, BytesDecodable};
+use crate::crypto::UInt256;
+use crate::util::base58;
+use crate::util::base58::encode_slice;
 
 pub trait Data {
     fn bit_is_true_at_le_index(&self, index: u32) -> bool;
@@ -204,3 +209,231 @@ pub fn address_with_script_signature(signature: &[u8], pub_key_address: u8, scri
     }
     d.base_58_check()
 }*/
+
+#[cfg(useDarkCoinSeed)]
+pub mod bip32 {
+    pub const SEED_KEY: &'static str = "Darkcoin seed";
+    pub const XPRV_MAINNET: &'static [u8] = b"\x02\xFE\x52\xCC";
+    pub const XPRV_TESTNET: &'static [u8] = b"\x02\xFE\x52\xCC";
+    pub const XPUB_MAINNET: &'static [u8] = b"\x02\xFE\x52\xF8";
+    pub const XPUB_TESTNET: &'static [u8] = b"\x02\xFE\x52\xF8";
+    pub const HARD: u32 = 0x80000000;
+    pub const HARD_LE: u32 = 0x00000080;
+}
+
+#[cfg(not(useDarkCoinSeed))]
+pub mod bip32 {
+    pub const SEED_KEY: &'static str = "Bitcoin seed";
+    pub const XPRV_MAINNET: &'static [u8] = b"\x04\x88\xAD\xE4";
+    pub const XPRV_TESTNET: &'static [u8] = b"\x04\x35\x83\x94";
+    pub const XPUB_MAINNET: &'static [u8] = b"\x04\x88\xB2\x1E";
+    pub const XPUB_TESTNET: &'static [u8] = b"\x04\x35\x87\xCF";
+    pub const HARD: u32 = 0x80000000;
+    pub const HARD_LE: u32 = 0x00000080;
+}
+
+#[cfg(not(useDarkCoinSeed))]
+pub mod dip14 {
+    pub const DPTS_TESTNET: &'static [u8] = b"\x0E\xED\x27\x74";
+    pub const DPTP_TESTNET: &'static [u8] = b"\x0E\xED\x27\x0B";
+    pub const DPMS_MAINNET: &'static [u8] = b"\x0E\xEC\xF0\x2E";
+    pub const DPMP_MAINNET: &'static [u8] = b"\x0E\xEC\xEF\xC5";
+}
+pub fn uint256_from_u32(value: u32) -> UInt256 {
+    let offset = &mut 0;
+    let mut vec8: Vec<u8> = vec![];
+    vec8.write_with::<u32>(offset, value, byte::LE).unwrap();
+    vec8.write_with::<u32>(offset, 0, byte::LE).unwrap();
+    vec8.write_with::<u64>(offset, 0, byte::LE).unwrap();
+    vec8.write_with::<u64>(offset, 0, byte::LE).unwrap();
+    vec8.write_with::<u64>(offset, 0, byte::LE).unwrap();
+    UInt256::from_bytes(vec8.as_slice(), &mut 0).unwrap()
+}
+pub fn uint256_from_long(value: u64) -> UInt256 {
+    let offset = &mut 0;
+    let mut vec8: Vec<u8> = vec![];
+    vec8.write_with::<u64>(offset, value, byte::LE).unwrap();
+    vec8.write_with::<u64>(offset, 0, byte::LE).unwrap();
+    vec8.write_with::<u64>(offset, 0, byte::LE).unwrap();
+    vec8.write_with::<u64>(offset, 0, byte::LE).unwrap();
+    UInt256::from_bytes(vec8.as_slice(), &mut 0).unwrap()
+}
+
+pub fn uint256_is_31_bits(value: UInt256) -> bool {
+    let u64_1 = value.0.read_with::<u64>(&mut 64, byte::LE).unwrap();
+    let u64_2 = value.0.read_with::<u64>(&mut 128, byte::LE).unwrap();
+    let u64_3 = value.0.read_with::<u64>(&mut 192, byte::LE).unwrap();
+    let u32_0 = value.0.read_with::<u32>(&mut 0, byte::LE).unwrap();
+    let u32_1 = value.0.read_with::<u32>(&mut 32, byte::LE).unwrap();
+    ((u64_1 | u64_2 | u64_3) == 0) && (u32_1 == 0) && (u32_0 & 0x80000000) == 0
+}
+
+/// helper function for serializing BIP32 master public/private keys to standard export format
+pub unsafe fn deserialize<'a>(
+    string: &'a str,
+    depth: *mut u8,
+    fingerprint: *mut u32,
+    hardened: *mut bool,
+    child: *mut UInt256,
+    chain_hash: *mut UInt256,
+    key: *mut Vec<u8>,
+    mainnet: bool) -> bool {
+    match base58::from(string) {
+        Ok(data) => match data.len() {
+            82 => {
+                let child32 = &mut 0;
+                let is_deserialized = deserialize32(string, depth, fingerprint, child32, chain_hash, key, mainnet);
+                if !is_deserialized {
+                    return false;
+                }
+                *child32 = (*child32).reverse_bits();
+                *hardened = (*child32 & bip32::HARD) > 0;
+                *child = uint256_from_u32(*child32 & !bip32::HARD);
+                is_deserialized
+            },
+            111 => {
+                deserialize256(string, depth, fingerprint, hardened, child, chain_hash, key, mainnet)
+            },
+            _ => false
+        },
+        _ => false
+    }
+}
+
+/// helper function for serializing BIP32 master public/private keys to standard export format
+pub fn serialize(depth: u8, fingerprint: u32, hardened: bool, child: UInt256, chain: UInt256, key: &[u8], mainnet: bool) -> String {
+    if uint256_is_31_bits(child) {
+        let mut small_i = child.0.read_with::<u32>(&mut 0, byte::LE).unwrap();
+        if hardened {
+            small_i |= bip32::HARD;
+        }
+        small_i = small_i.reverse_bits();
+        serialize32(depth, fingerprint, small_i, chain, key, mainnet)
+    } else {
+        serialize256(depth, fingerprint, hardened, child, chain, key, mainnet)
+    }
+}
+
+
+/// helper function for serializing BIP32 master public/private keys to standard export format
+pub unsafe fn deserialize32<'a>(
+    string: &'a str,
+    depth: *mut u8,
+    fingerprint: *mut u32,
+    child: *mut u32,
+    chain_hash: *mut UInt256,
+    key: *mut Vec<u8>,
+    mainnet: bool) -> bool {
+    match base58::from(string) {
+        Ok(all_data) => match all_data.len() {
+            82 => {
+                let data = &all_data[..78];
+                let check_data = &all_data[78..];
+                let equal = hashes::sha256d::Hash::hash(data).into_inner().eq(check_data);
+                if equal {
+                    let xprv = if mainnet { bip32::XPRV_MAINNET } else { bip32::XPRV_TESTNET };
+                    let xpub = if mainnet { bip32::XPUB_MAINNET } else { bip32::XPUB_TESTNET };
+                    if data != xprv && data != xpub {
+                        return false;
+                    }
+                    let offset = &mut 4;
+                    *depth = data.read_with::<u8>(offset, byte::LE).unwrap();
+                    *fingerprint = data.read_with::<u32>(offset, byte::LE).unwrap();
+                    *child = data.read_with::<u32>(offset, byte::LE).unwrap();
+                    *chain_hash = data.read_with::<UInt256>(offset, byte::LE).unwrap();
+                    if data == xprv {
+                        *offset += 1;
+                    }
+                    *key = data[*offset..data.len() - *offset].to_vec();
+                }
+                equal
+            },
+            _ => false
+        }
+        Err(_) => false
+    }
+}
+
+pub fn serialize32(depth: u8, fingerprint: u32, child: u32, chain: UInt256, key: &[u8], mainnet: bool) -> String {
+    // NSMutableData *d = [NSMutableData secureDataWithCapacity:14 + key.length + sizeof(chain)];
+    let offset = &mut 0;
+    let mut d: Vec<u8> = Vec::with_capacity(14 + key.len() + 32);
+    if key.len() < 33 {
+        d.write_with(offset, if mainnet {bip32::XPRV_MAINNET} else {bip32::XPRV_TESTNET}, Default::default()).unwrap(); // 4
+    } else {
+        d.write_with(offset, if mainnet {bip32::XPUB_MAINNET} else {bip32::XPUB_TESTNET}, Default::default()).unwrap(); // 4
+    }
+    d.write_with::<u8>(offset, depth, byte::LE).unwrap(); // 5
+    d.write_with::<u32>(offset, fingerprint, byte::LE).unwrap(); // 9
+    d.write_with::<u32>(offset, child, byte::LE).unwrap(); // 13
+    d.write_with(offset, chain.as_bytes(), Default::default()).unwrap(); // 45
+    if key.len() < 33 {
+        d.write_with(offset, b"\0".as_slice(), Default::default()).unwrap(); // 46 (prv) / 45 (pub)
+    }
+    d.write_with(offset, key, Default::default()).unwrap(); // 78 (prv) / 78 (pub)
+    encode_slice(&d)
+}
+
+/// helper function for serializing BIP32 master public/private keys to standard export format
+pub unsafe fn deserialize256<'a>(
+    string: &'a str,
+    depth: *mut u8,
+    fingerprint: *mut u32,
+    hardened: *mut bool,
+    child: *mut UInt256,
+    chain_hash: *mut UInt256,
+    key: *mut Vec<u8>,
+    mainnet: bool) -> bool {
+    match base58::from(string) {
+        Ok(all_data) => match all_data.len() {
+            111 => {
+                let data = &all_data[..107];
+                let check_data = &all_data[107..];
+                if hashes::sha256d::Hash::hash(data).into_inner().eq(check_data) {
+                    let s = if mainnet { dip14::DPMS_MAINNET } else { dip14::DPTS_TESTNET };
+                    let p = if mainnet { dip14::DPMP_MAINNET } else { dip14::DPTP_TESTNET };
+
+                    if data != s && data != p {
+                        return false;
+                    }
+                    let offset = &mut 4;
+                    *depth = data.read_with::<u8>(offset, byte::LE).unwrap();
+                    *fingerprint = data.read_with::<u32>(offset, byte::LE).unwrap();
+                    *hardened = data.read_with::<u8>(offset, byte::LE).unwrap() != 0;
+                    *child = data.read_with::<UInt256>(offset, byte::LE).unwrap();
+                    *chain_hash = data.read_with::<UInt256>(offset, byte::LE).unwrap();
+
+                    if data == if mainnet { dip14::DPMS_MAINNET } else { bip32::XPRV_TESTNET } {
+                        *offset += 1;
+                    }
+                    *key = data[*offset..data.len() - *offset].to_vec();
+                    true
+                } else {
+                    false
+                }
+            },
+            _ => false
+        },
+        _ => false
+    }
+}
+pub fn serialize256(depth: u8, fingerprint: u32, hardened: bool, child: UInt256, chain: UInt256, key: &[u8], mainnet: bool) -> String {
+    //NSMutableData *d = [NSMutableData secureDataWithCapacity:47 + key.length + sizeof(chain)];
+    let offset = &mut 0;
+    let mut d: Vec<u8> = Vec::with_capacity(47 + key.len() + 32);
+    if key.len() < 33 {
+        d.write_with(offset, if mainnet {dip14::DPMS_MAINNET} else {dip14::DPTS_TESTNET}, Default::default()).unwrap(); // 4
+    } else {
+        d.write_with(offset, if mainnet {dip14::DPMP_MAINNET} else {dip14::DPTP_TESTNET}, Default::default()).unwrap(); // 4
+    }
+    d.write_with::<u8>(offset, depth, byte::LE).unwrap(); // 5
+    d.write_with::<u32>(offset, fingerprint, byte::LE).unwrap(); // 9
+    d.write_with::<u8>(offset, u8::from(hardened), byte::LE).unwrap(); // 10
+    d.write_with(offset, child.as_bytes(), Default::default()).unwrap(); // 42
+    d.write_with(offset, chain.as_bytes(), Default::default()).unwrap(); // 74
+    if key.len() < 33 {
+        d.write_with(offset, b"\0".as_slice(), Default::default()).unwrap(); // 75 (prv) / 74 (pub)
+    }
+    d.write_with(offset, key, Default::default()).unwrap(); // 107 (prv) / 107 (pub)
+    encode_slice(&d)
+}
