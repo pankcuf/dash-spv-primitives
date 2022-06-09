@@ -54,7 +54,7 @@ impl deserialize::FromSql<sql_types::Nullable<sql_types::Bool>, sqlite::Sqlite> 
 #[derive(FromSqlRow, AsExpression)]
 #[sql_type = "sql_types::Binary"]
 pub struct BDictionary<'a, K: TryRead<'a, byte::ctx::Endian> + AsBytes + Ord, V: TryRead<'a, byte::ctx::Endian> + AsBytes> {
-    map: BTreeMap<K, V>,
+    pub map: BTreeMap<K, V>,
     _phantom: std::marker::PhantomData<&'a ()>,
 }
 
