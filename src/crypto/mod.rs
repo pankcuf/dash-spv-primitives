@@ -4,6 +4,7 @@ pub mod var_bytes;
 pub mod var_int;
 pub mod bool;
 pub mod diesel_ext;
+pub mod index_path;
 
 pub use self::var_bytes::VarBytes;
 pub use self::bool::Boolean;
