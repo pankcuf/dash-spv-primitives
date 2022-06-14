@@ -12,7 +12,7 @@ impl<T> IndexPath<T>  {
         IndexPath { indexes, length: indexes.len() }
     }
 
-    pub fn index_at_position(&self, position: T) -> T {
-        self.indexes[position]
+    pub fn index_at_position(&self, position: T) -> Option<T> {
+        self.indexes.get(position)
     }
 }
