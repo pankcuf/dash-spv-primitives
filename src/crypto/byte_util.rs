@@ -254,3 +254,6 @@ define_bytes_to_big_uint!(UInt256, 32);
 define_bytes_to_big_uint!(UInt384, 48);
 define_bytes_to_big_uint!(UInt512, 64);
 define_bytes_to_big_uint!(UInt768, 96);
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ECPoint(pub [u8; 33]);
