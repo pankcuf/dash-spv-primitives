@@ -10,6 +10,8 @@ use crate::util::base58::encode_slice;
 pub trait Data {
     fn bit_is_true_at_le_index(&self, index: u32) -> bool;
     fn true_bits_count(&self) -> u64;
+    fn to_sha256(&self) -> UInt256;
+    fn to_sha256d(&self) -> UInt256;
 }
 
 impl Data for [u8] {
@@ -35,6 +37,13 @@ impl Data for [u8] {
             }
         }
         count
+    }
+
+    fn to_sha256(&self) -> UInt256 {
+        UInt256(hashes::sha256::Hash::hash(self).into_inner())
+    }
+    fn to_sha256d(&self) -> UInt256 {
+        UInt256(hashes::sha256d::Hash::hash(self).into_inner())
     }
 }
 
