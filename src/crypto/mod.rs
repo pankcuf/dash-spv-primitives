@@ -1,5 +1,6 @@
 pub mod data_ops;
 pub mod byte_util;
+pub mod var_array;
 pub mod var_bytes;
 pub mod var_int;
 pub mod bool;
