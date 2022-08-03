@@ -1,14 +1,11 @@
 use std::io;
 use byte::ctx::Endian;
 use byte::{BytesExt, check_len, LE, TryRead};
-use diesel::sql_types::Bool;
 use crate::consensus::Decodable;
 use crate::crypto::byte_util::{AsBytes, BytesDecodable};
 use crate::impl_bytes_decodable;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-#[derive(FromSqlRow, AsExpression)]
-#[sql_type = "Bool"]
 pub struct Boolean(pub bool);
 
 impl<'a> TryRead<'a, Endian> for Boolean {

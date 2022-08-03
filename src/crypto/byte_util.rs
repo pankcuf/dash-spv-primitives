@@ -1,6 +1,5 @@
 use byte::{BytesExt, LE, Result, TryRead};
 use byte::ctx::Endian;
-use diesel::sql_types::Binary;
 use std::{mem, slice};
 use hashes::Hash;
 use crate::consensus::{Decodable, Encodable, ReadExt, WriteExt};
@@ -57,28 +56,16 @@ pub trait BytesDecodable<'a, T: TryRead<'a, Endian>> {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[derive(FromSqlRow, AsExpression)]
-#[sql_type = "Binary"]
 pub struct UInt128(pub [u8; 16]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[derive(FromSqlRow, AsExpression)]
-#[sql_type = "Binary"]
 pub struct UInt160(pub [u8; 20]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[derive(FromSqlRow, AsExpression)]
-#[sql_type = "Binary"]
 pub struct UInt256(pub [u8; 32]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[derive(FromSqlRow, AsExpression)]
-#[sql_type = "Binary"]
 pub struct UInt384(pub [u8; 48]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[derive(FromSqlRow, AsExpression)]
-#[sql_type = "Binary"]
 pub struct UInt512(pub [u8; 64]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[derive(FromSqlRow, AsExpression)]
-#[sql_type = "Binary"]
 pub struct UInt768(pub [u8; 96]);
 
 
