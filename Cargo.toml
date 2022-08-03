@@ -1,12 +1,12 @@
 [package]
 name = "dash-spv-primitives"
 version = "0.1.13"
-edition = "2018"
+edition = "2021"
 publish = false
 
 # Please don't forget to add relevant features to docs.rs below
 [features]
-default = [ "std", "secp-recovery" ]
+default = ["std", "secp-recovery"]
 unstable = []
 rand = ["secp256k1/rand-std"]
 secp-lowmemory = ["secp256k1/lowmemory"]
