@@ -48,6 +48,9 @@ pub trait Zeroable {
     fn is_zero(&self) -> bool;
 }
 
+pub trait MutDecodable<'a, T: TryRead<'a, Endian>> {
+    fn from_mut(bytes: *mut u8) -> Option<T>;
+}
 pub trait ConstDecodable<'a, T: TryRead<'a, Endian>> {
     fn from_const(bytes: *const u8) -> Option<T>;
 }
@@ -104,6 +107,15 @@ macro_rules! impl_decodable {
         impl<'a> ConstDecodable<'a, $var_type> for $var_type {
             fn from_const(bytes: *const u8) -> Option<Self> {
                 let safe_bytes = unsafe { slice::from_raw_parts(bytes, $byte_len) };
+                match safe_bytes.read_with::<Self>(&mut 0, LE) {
+                    Ok(data) => Some(data),
+                    Err(_err) => None
+                }
+            }
+        }
+        impl<'a> MutDecodable<'a, $var_type> for $var_type {
+            fn from_mut(bytes: *mut u8) -> Option<Self> {
+                let safe_bytes = unsafe { slice::from_raw_parts_mut(bytes, $byte_len) };
                 match safe_bytes.read_with::<Self>(&mut 0, LE) {
                     Ok(data) => Some(data),
                     Err(_err) => None
