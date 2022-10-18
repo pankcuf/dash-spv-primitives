@@ -33,7 +33,7 @@ pub fn merkle_root_from_hashes(hashes: Vec<UInt256>) -> Option<UInt256> {
         }
         level = higher_level;
     }
-    return Some(level[0]);
+    Some(level[0])
 }
 
 pub trait AsBytes {

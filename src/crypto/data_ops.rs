@@ -37,8 +37,8 @@ impl Data for [u8] {
 pub fn hex_with_data(data: &[u8]) -> String {
     let n = data.len();
     let mut s = String::with_capacity(2 * n);
-    let mut iter = data.iter();
-    while let Some(a) = iter.next() {
+    let iter = data.iter();
+    for a in iter {
         write!(s, "{:02x}", a).unwrap();
     }
     s
@@ -76,7 +76,7 @@ pub fn inplace_intersection<T>(a: &mut HashSet<T>, b: &mut HashSet<T>) -> HashSe
             a.insert(v);
         }
     }
-    b.retain(|v| !c.contains(&v));
+    b.retain(|v| !c.contains(v));
     c
 }
 
