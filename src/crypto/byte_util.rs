@@ -105,6 +105,7 @@ macro_rules! impl_decodable {
         impl_bytes_decodable!($var_type);
 
         impl<'a> ConstDecodable<'a, $var_type> for $var_type {
+            #[allow(clippy::not_unsafe_ptr_arg_deref)]
             fn from_const(bytes: *const u8) -> Option<Self> {
                 let safe_bytes = unsafe { slice::from_raw_parts(bytes, $byte_len) };
                 match safe_bytes.read_with::<Self>(&mut 0, LE) {
@@ -114,6 +115,7 @@ macro_rules! impl_decodable {
             }
         }
         impl<'a> MutDecodable<'a, $var_type> for $var_type {
+            #[allow(clippy::not_unsafe_ptr_arg_deref)]
             fn from_mut(bytes: *mut u8) -> Option<Self> {
                 let safe_bytes = unsafe { slice::from_raw_parts_mut(bytes, $byte_len) };
                 match safe_bytes.read_with::<Self>(&mut 0, LE) {

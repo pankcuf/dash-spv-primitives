@@ -374,6 +374,10 @@ impl VarInt {
             _                    => { 9 }
         }
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.0 == 0
+    }
 }
 
 impl std::fmt::Display for VarInt {

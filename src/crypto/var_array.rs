@@ -14,7 +14,9 @@ impl<T> VarArray<T> {
     pub fn len(&self) -> usize {
         self.0.len() + self.1.len()
     }
-
+    pub fn is_empty(&self) -> bool {
+        self.1.is_empty()
+    }
     pub fn new(var_int: VarInt, arr: Vec<T>) -> VarArray<T> {
         Self(var_int, arr)
     }
